@@ -1,57 +1,60 @@
 #include <Wire.h>
 #include <L3G.h>
-#include <Servo.h>
 
+// Define the PID constants
+double Kp = 1.0;  // Proportional constant
+double Ki = 0.0;  // Integral constant
+double Kd = 0.0;  // Derivative constant
+
+// Define the setpoint (desired value)
+double setpoint = 0.0;
+
+// Variables for sensor data
 L3G gyro;
-Servo zservo;
 
-int pos = 0;
-const int startpin = 2;
-const int endpin = 3;
-const int updatepin = 4;
+// Variables for PID control
+double previousError = 0.0;
+double integral = 0.0;
 
-int zStart = 0;
+// Variables for timing
+unsigned long previousTime = 0;
+double dt = 0.0;
 
-int zEnd = 0;
-
-int refAngle = 90;
+// Function to compute the PID control output
+double computePID() {
+  double error = setpoint - gyro.readZ();
+  double output = Kp * error + Ki * integral + Kd * (error - previousError);
+  integral += error * dt;
+  previousError = error;
+  return output;
+}
 
 void setup() {
-  Serial.begin(9600);
-  zservo.attach(9);
-  zservo.write(refAngle);
-  pinMode(startpin, INPUT);
-  pinMode(endpin, INPUT);
-  pinMode(updatepin, INPUT);
-
-  Wire.begin();
-
-  if (!gyro.init()) {
-    Serial.print("Failed to autodetect gyro type!");
-    while (1);
-  }
-
+  // Initialize the sensor
+  gyro.init();
   gyro.enableDefault();
-  zservo.write(0);
+
+  // Initialize Serial communication
+  Serial.begin(9600);
 }
 
 void loop() {
-  if(digitalRead(startpin) == HIGH){
-    Serial.println("Started!");
-    gyro.read();
-    zStart = gyro.g.z;
-  }
-  if(digitalRead(endpin) == HIGH){
-    Serial.println("Ended!");
-    gyro.read();
-    zEnd = gyro.g.z;
-  }
-  if(digitalRead(updatepin) == HIGH){
-    Serial.println("Updated!");
-    int val = zEnd - zStart;
-    Serial.println(val);
-    Serial.println(refAngle + val);
-    zservo.write(refAngle + val);
-  }
-  delay(200);
+  // Read sensor data
+  gyro.read();
+  
+  // Calculate time difference
+  unsigned long currentTime = millis();
+  dt = (double)(currentTime - previousTime) / 1000.0;  // Convert to seconds
+  previousTime = currentTime;
+  
+  // Compute PID control output
+  double output = computePID();
+  
+  // Apply the control output (adjust as needed)
+  // Example: You can use the output to control a motor or a servo
+  // For simplicity, we'll just print it to Serial here
+  Serial.print("PID Output: ");
+  Serial.println(output);
+  
+  delay(100);  // Adjust the loop rate as needed
 }
